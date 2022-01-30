@@ -49,8 +49,10 @@ class MessageBox(ptg.Container):
             self._add_widget(ptg.Label("[245 italic]-- " + new.data.event_type + " --"))
             return
 
-        assert new.username
+        # Just to calm mypy down.
         assert isinstance(new.data, str)
+
+        assert new.username
 
         self._widgets = []
         self._add_widget(
@@ -111,7 +113,6 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         self._add_widget(self._conv_box)
 
         field = ptg.InputField()
-        field.set_style("value", lambda _, item: item)
         field.bind(ptg.keys.RETURN, self._send_field_value)
 
         self._add_widget(widgets.get_inputbox("Message", field=field))
