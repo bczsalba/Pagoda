@@ -17,14 +17,14 @@ from typing import Any, Callable
 from teahaz import Teacup, Chatroom
 import pytermgui as ptg
 
-from ..widgets import get_inputbox
+from ..widgets import get_inputbox, Header
 
 
 # This is only going to stay here as long as
 # rapid testing of chatroom create / login is
 # required.
 TEMP_DEFAULTS = {
-    key.split("_")[-1].lower(): os.environ.get(key)
+    key.rsplit("_", 1)[-1].lower(): os.environ.get(key)
     for key in [
         "PAGODA_URL",
         "PAGODA_CONV_NAME",
@@ -99,10 +99,19 @@ class TeahazWindow(ptg.Window):
         self.callback = func
         threaded_callback = self._cup.threaded(self.callback, self.handle_output)
 
-        self._add_widget("[title]" + func.__name__.title().replace("_", " "))
+        self._add_widget(Header("[title]" + func.__name__.title().replace("_", " ")))
+        self._add_widget("")
+
+        if func.__doc__ is not None:
+            doc = func.__doc__
+            self._add_widget(
+                ptg.Label("[245 italic] > " + doc.splitlines()[0], parent_align=0)
+            )
+
         self._add_widget("")
 
         for param in inspect.signature(func).parameters.values():
+            default = param.default
             if param.default == inspect.Signature.empty:
                 default = self.defaults.get(param.name, "")
 

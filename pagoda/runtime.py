@@ -20,15 +20,19 @@ config:
         styles:
             fill: "[field-text]{item}"
 
-    # Window:
-    #     styles:
-    #         border: &border "[!gradient(60:{depth})]{item}"
-    #         corner: *border
+    Window:
+        styles:
+            border: &border "[!gradient(60:{depth})]{item}"
+            corner: *border
 
-    # Container:
-    #     styles:
-    #         border: '[60]{item}'
-    #         corner: '[60]{item}'
+    Container:
+        styles:
+            border: *border
+            corner: *border
+
+    Header:
+        styles:
+            border: "[60]{item}"
 
 markup:
     title: 210 bold
@@ -128,6 +132,7 @@ class App(ptg.WindowManager):
         ptg.markup.define("title", lambda item: item.title().replace("_", " "))
 
         loader = ptg.YamlLoader()
+        loader.register(widgets.Header)
         loader.load(CONFIG)
 
     def add_chatroom(self, chatroom: Chatroom) -> None:

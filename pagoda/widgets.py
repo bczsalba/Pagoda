@@ -65,6 +65,8 @@ class Menubar(ptg.Window):
 class Header(ptg.Container):
     """A simple header bar widget to use inside of Windows."""
 
+    styles = ptg.Container.styles.copy()
+
     def __init__(self, label: str, **attrs) -> None:
         """Initializes a Header widget."""
 
