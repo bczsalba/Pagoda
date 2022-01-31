@@ -149,3 +149,9 @@ class App(ptg.WindowManager):
             window.center()
 
         return super().add(window)
+
+    def exit(self):
+        """Gracefully stops all Teacup threads before exiting program."""
+
+        self.cup.stop()
+        super().exit()
