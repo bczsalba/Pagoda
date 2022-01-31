@@ -77,12 +77,14 @@ class App(ptg.WindowManager):
             ptg.keys.CTRL_W, lambda *_: self.focused.close() if self.focused else None
         )
 
-        self.add(
-            widgets.Menubar(
-                self._get_menubar_button(self.cup.create_chatroom),
-                self._get_menubar_button(self.cup.login),
-            )
+        menubar = ptg.Window(
+            is_static=True, is_noresize=True, is_noblur=True
+        ) + widgets.Menubar(
+            self._get_menubar_button(self.cup.create_chatroom),
+            self._get_menubar_button(self.cup.login),
         )
+        menubar.box = ptg.boxes.EMPTY
+        self.add(menubar)
 
     def _get_menubar_button(self, func: Callable[..., Any]) -> ptg.Button:
         """Gets a button with callback creating teahazwindow"""

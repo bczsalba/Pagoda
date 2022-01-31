@@ -26,13 +26,10 @@ def get_inputbox(
     return box
 
 
-class Menubar(ptg.Window):
+class Menubar(ptg.Container):
     """A menubar to hoist at the top of the screen."""
 
-    pos = ptg.terminal.origin
-    is_noblur = True
-    is_static = True
-    is_noresize = True
+    parent_align = ptg.HorizontalAlignment.LEFT
 
     def __init__(self, *buttons, **attrs) -> None:
         """Initialize menubar."""
@@ -42,6 +39,10 @@ class Menubar(ptg.Window):
         self.width = ptg.terminal.width
 
         for button in buttons:
+            if not isinstance(button, ptg.Widget):
+                button = ptg.Widget.from_data(button)
+                assert button is not None
+
             line = button.get_lines()[0]
             button.width = ptg.real_length(line)
             self._add_widget(button)
