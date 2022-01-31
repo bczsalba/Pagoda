@@ -1,13 +1,12 @@
 """The runtime component of the Pagoda client."""
 
-from typing import Any, Callable
+from typing import Any, Type
 
 import pytermgui as ptg
 from requests import Response
-from teahaz import Teacup, Chatroom, Event
 
 from . import widgets
-from . import windows
+from . import applications
 
 #: This is temporary
 CONFIG = """\
@@ -43,57 +42,62 @@ markup:
 """
 
 
-class App(ptg.WindowManager):
-    """The Pagoda Application class.
+class Pagoda(ptg.WindowManager):
+    """The Pagoda class.
 
     If for some reason you would want to use this manually,
     you can use the context manager syntax:
 
     ```python3
-    from pagoda.runtime import App
+    from pagoda.runtime import Pagoda
 
-    with App() as app:
-        app.run()
+    with Pagoda() as pagoda:
+        pagoda.run()
     ```
 
     This ensures errors are dealt with cleanly, and all open
     files are closed.
     """
 
-    cup: Teacup
-    """The Teacup used for API operations."""
+    application_managers: list[Type[applications.PagodaApplication]] = [
+        applications.TeahazApplication,
+        # TODO: This could be useful? But I'm not sure how well a global
+        #       error handler like this would work.
+        # applications.ErrorHandler(),
+    ]
 
     def __init__(self) -> None:
         """Initialize application."""
 
         super().__init__()
 
+        self.applications: list[applications.PagodaApplication] = []
+
+        for app in self.application_managers:
+            self.applications.append(app(self))
+
         self.setup_styles()
 
-        self.cup = Teacup()
-        self.cup.subscribe_all(Event.ERROR, self._display_error)
         self.bind("*", lambda *_: self.show_targets())
-        self.bind(
-            ptg.keys.CTRL_W, lambda *_: self.focused.close() if self.focused else None
+        self.bind(ptg.keys.CTRL_W, self.close_window)
+
+        self._menubar = ptg.Window(is_static=True, is_noresize=True, is_noblur=True)
+        self._menubar.box = ptg.boxes.EMPTY
+
+        self._menubar += widgets.Menubar(
+            *[
+                ptg.Button(
+                    app.title,
+                    lambda app=app: (self.add(app.construct_window())),  # type: ignore
+                )
+                for app in self.applications
+            ]
         )
 
-        menubar = ptg.Window(
-            is_static=True, is_noresize=True, is_noblur=True
-        ) + widgets.Menubar(
-            self._get_menubar_button(self.cup.create_chatroom),
-            self._get_menubar_button(self.cup.login),
-        )
-        menubar.box = ptg.boxes.EMPTY
-        self.add(menubar)
+        self.add(self._menubar)
 
-    def _get_menubar_button(self, func: Callable[..., Any]) -> ptg.Button:
-        """Gets a button with callback creating teahazwindow"""
-
-        return ptg.Button(
-            "[!title]" + func.__name__,
-            lambda *_: self.add(windows.TeahazWindow(self.cup).from_signature(func)),
-        )
-
+    # TODO: Move this to ErrorHandler app, others can interface with it using
+    #       manager.error()
     def _display_error(
         self, response: Response, method: str, req_kwargs: dict[str, Any]
     ) -> None:
@@ -137,10 +141,13 @@ class App(ptg.WindowManager):
         loader.register(widgets.Header)
         loader.load(CONFIG)
 
-    def add_chatroom(self, chatroom: Chatroom) -> None:
-        """Adds a chatroom."""
+    def close_window(self, *_: ptg.WindowManager) -> None:
+        """Closes the currently focused window, so long as it is not our menubar."""
 
-        self.add(windows.ChatroomWindow(chatroom, self.cup))
+        if self.focused is None or self.focused is self._menubar:
+            return
+
+        self.focused.close()
 
     def add(self, window: ptg.Window) -> ptg.WindowManager:
         """Adds a window, and centers it."""
@@ -153,5 +160,7 @@ class App(ptg.WindowManager):
     def exit(self):
         """Gracefully stops all Teacup threads before exiting program."""
 
-        self.cup.stop()
+        for app in self.applications:
+            app.stop()
+
         super().exit()

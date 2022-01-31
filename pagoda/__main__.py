@@ -1,13 +1,13 @@
 """Pagoda's runner module."""
 
-from .runtime import App
+from .runtime import Pagoda
 
 
 def main() -> None:
-    """Run Pagoda."""
+    """Runs Pagoda."""
 
-    with App() as app:
-        app.run()
+    with Pagoda() as pagoda:
+        pagoda.run()
 
 
 if __name__ == "__main__":
