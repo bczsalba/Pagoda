@@ -1,9 +1,6 @@
 """The runtime component of the Pagoda client."""
 
-from typing import Any, Type
-
 import pytermgui as ptg
-from requests import Response
 
 from . import widgets
 from . import applications
@@ -59,12 +56,11 @@ class Pagoda(ptg.WindowManager):
     files are closed.
     """
 
-    application_managers: list[Type[applications.PagodaApplication]] = [
-        applications.TeahazApplication,
-        # TODO: This could be useful? But I'm not sure how well a global
-        #       error handler like this would work.
-        # applications.ErrorHandler(),
-    ]
+    application_managers = applications.list_applications()
+
+    # TODO: This could be useful? But I'm not sure how well a global
+    #       error handler like this would work.
+    # applications.ErrorHandler(),
 
     def __init__(self) -> None:
         """Initialize application."""
