@@ -24,8 +24,34 @@ class TeahazApplication(PagodaApplication):
         """Initializes the TeahazApplication, and its Teacup instance."""
 
         self._cup = Teacup()
+        self._cup.subscribe_all(Event.ERROR, self._error)
 
         super().__init__(manager)
+
+    def _error(
+        self, response: Response, method: str, req_kwargs: dict[str, Any]
+    ) -> None:
+        """Passes information to ErrorHandler application."""
+
+        content = ptg.Container(
+            {
+                "[error-key]Error:": "[error-value]" + str(response.json()),
+            },
+            {
+                "[error-key]Method:": "[error-value]" + method.upper(),
+            },
+        )
+
+        content.box = ptg.boxes.SINGLE
+
+        content += ptg.Label("[72 bold]request_arguments[/] = {", parent_align=0)
+        for key, value in {**req_kwargs, "url": response.url}.items():
+            content += ptg.Label(f"    [italic 243]{key}: [157]{value}", parent_align=0)
+        content += ptg.Label("}", parent_align=0)
+
+        # The Pagoda class does have this method, but we cannot correctly type annotate
+        # it without causing cyclic imports.
+        self.manager.error(self, content)  # type: ignore
 
     def construct_window(self, **attrs: Any) -> ptg.Window:
         """Constructs a picker for the various ways one can sign into Teahaz."""

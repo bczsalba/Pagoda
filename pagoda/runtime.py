@@ -92,33 +92,24 @@ class Pagoda(ptg.WindowManager):
 
         self.add(self._menubar)
 
-    # TODO: Move this to ErrorHandler app, others can interface with it using
-    #       manager.error()
-    def _display_error(
-        self, response: Response, method: str, req_kwargs: dict[str, Any]
+    def error(
+        self, caller: applications.PagodaApplication, content: ptg.Container
     ) -> None:
-        """Creates a modal window to show the error."""
+        """Displays an error using the ErrorHandler application."""
 
-        if response.status_code == 200:
-            return
-
-        modal = (
-            ptg.Window(is_modal=True, width=70, is_resizable=False)
-            + "[error-title]An error occured!"
-            + ""
-            + {"[error-key]Method:": "[error-value]" + method.upper()}
-            + {"[error-key]Error:": "[error-value]" + str(response.json())}
+        window = ptg.Window(
+            vertical_align=ptg.VerticalAlignment.TOP,
+            is_modal=True,
+            width=80,
         )
+        window += widgets.Header(f"[title]An error occured in [bold]{caller.title}.")
 
-        modal += ptg.Label("[72 bold]request_arguments[/] = {", parent_align=0)
-        for key, value in {**req_kwargs, "url": response.url}.items():
-            modal += ptg.Label(f"    [italic 243]{key}: [157]{value}", parent_align=0)
-        modal += ptg.Label("}", parent_align=0)
+        window += ""
+        window += content
+        window += ""
+        window += ptg.Button("Dismiss", lambda *_: window.close())
 
-        modal += ""
-        modal += ["Close!", lambda *_: modal.close()]
-
-        self.add(modal)
+        self.add(window)
 
     @staticmethod
     def setup_styles() -> None:
