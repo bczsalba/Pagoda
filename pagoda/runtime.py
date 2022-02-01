@@ -88,7 +88,7 @@ class Pagoda(ptg.WindowManager):
             *[
                 ptg.Button(
                     app.title,
-                    lambda app=app: (self.add(app.construct_window())),  # type: ignore
+                    lambda *_, app=app: (self.add(app.construct_window())),  # type: ignore
                 )
                 for app in self.applications
             ]

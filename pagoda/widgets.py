@@ -2,8 +2,23 @@
 
 from __future__ import annotations
 
-from typing import Any
+import os
+import inspect
+from typing import Any, Callable
+
 import pytermgui as ptg
+from teahaz import Teacup
+
+
+TEMP_DEFAULTS = {
+    key.rsplit("_", 1)[-1].lower(): os.environ.get(key)
+    for key in [
+        "PAGODA_URL",
+        "PAGODA_CONV_NAME",
+        "PAGODA_USERNAME",
+        "PAGODA_PASSWORD",
+    ]
+}
 
 
 def get_inputbox(
@@ -103,3 +118,54 @@ class Header(ptg.Container):
         more information."""
 
         self._label.value = new
+
+
+def from_signature(
+    method: Callable[..., Any], handle_output: Callable[..., Any]
+) -> ptg.Window:
+    """Creates a window from a function signature.
+
+    Args:
+        method: The method to generate window from.
+        handle_output: The output handler. Its signature depends on the method given.
+
+    Returns:
+        A window with InputFields for all parameters for the method.
+    """
+
+    window = ptg.Window(width=70)
+    window += Header("[title]" + method.__name__.title().replace("_", " "))
+    window += ""
+
+    # Add documentation's first line if it is found
+    if method.__doc__ is not None:
+        doc = method.__doc__
+        window += ptg.Label("[245 italic] > " + doc.splitlines()[0], parent_align=0)
+
+    window += ""
+
+    # Construct widgets based on method signature
+    fields: dict[str, Callable[[], str]] = {}
+    for param in inspect.signature(method).parameters.values():
+        default = param.default
+
+        if param.default == inspect.Signature.empty:
+            default = TEMP_DEFAULTS.get(param.name, "")
+
+        field = ptg.InputField(value=default or "")
+        window += get_inputbox(param.name.title(), field)
+
+        # Mypy cannot infer type, yet providing it doesn't help.
+        fields[param.name] = lambda field=field: field.value  # type: ignore
+
+    # Create submission button
+    # TODO: This should open a loader modal.
+    threaded = Teacup.threaded(
+        method, lambda *args, **kwargs: handle_output(window, *args, **kwargs)
+    )
+    window += ptg.Button(
+        "Submit!",
+        lambda *_: threaded(**{key: value() for key, value in fields.items()}),
+    )
+
+    return window
