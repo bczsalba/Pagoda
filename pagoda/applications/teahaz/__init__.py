@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Callable, Any
 
 import pytermgui as ptg
+from requests import Response
 from teahaz import Teacup, Chatroom, Message, Event, SystemEvent
 
 from ... import widgets
@@ -81,6 +82,7 @@ class TeahazApplication(PagodaApplication):
             self._get_base_window(**attrs)
             + ""
             + ptg.Button("Choose from logged-in chatrooms")
+            + ""
             + ptg.Button("Create a chatroom", _get_runner(self._cup.create_chatroom))
             + ptg.Button("Log into a chatroom", _get_runner(self._cup.login))
             + ""

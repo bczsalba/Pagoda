@@ -1,11 +1,15 @@
 """The module containing the Teahaz application's Chatroom window."""
 
+from __future__ import annotations
+
+import json
 from typing import Any
+from dataclasses import asdict
 
 import pytermgui as ptg
-from teahaz import Teacup, Chatroom, Message, Event, SystemEvent
+from teahaz import Teacup, Chatroom, Message, Event, SystemEvent, Invite
 
-from ...widgets import Header, get_inputbox
+from ... import widgets
 
 
 class MessageBox(ptg.Container):
@@ -62,10 +66,6 @@ class MessageBox(ptg.Container):
         self.get_lines()
 
 
-# TODO: Refactor this. We can do better!
-#       This and `MessageBox` should both be
-#       moved under a separate module inside
-#       this application.
 class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attributes
     """The Pagoda Chatroom window."""
 
@@ -110,16 +110,66 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         self._old_size = (self.width, self.height)
         self._old_height_sum = self._get_height_sum()
 
-        self._add_widget(Header(str(self.chatroom.name)))
+        self._add_widget(widgets.Header(str(self.chatroom.name)))
+        self._add_widget(
+            widgets.Menubar(
+                (
+                    "Create invite",
+                    lambda *_: self.manager.add(
+                        widgets.from_signature(
+                            self.chatroom.create_invite, self._write_invite
+                        )
+                    )
+                    if self.manager
+                    else None,
+                )
+            )
+        )
         self._add_widget(self._conv_box)
 
         field = ptg.InputField()
         field.bind(ptg.keys.RETURN, self._send_field_value)
 
-        self._add_widget(get_inputbox("Message", field=field))
+        self._add_widget(widgets.get_inputbox("Message", field=field))
         self.height = 30
 
         self.chatroom.send("hello world!")
+
+    def _write_invite(self, caller: ptg.Window, invite: Invite | None) -> None:
+        """Writes the invite to a file."""
+
+        file_dialog: ptg.Window
+
+        def _write(name: str) -> None:
+            """Writes the invite."""
+
+            with open(name, "w", encoding="utf-8") as file:
+                json.dump(asdict(invite), file, indent=2)
+
+            file_dialog.close()
+            caller.close()
+
+        if invite is None:
+            return
+
+        if self.chatroom.name is None:
+            default = "invite.inv"
+        else:
+            default = self.chatroom.name.replace(" ", "_") + ".inv"
+
+        field = ptg.InputField(value=default)
+
+        file_dialog = (
+            ptg.Window(is_modal=True, width=50)
+            + "[title]Invite created!"
+            + ""
+            + widgets.get_inputbox("Save invite as", field)
+            + ""
+            + ptg.Button("Save!", lambda *_: _write(field.value))
+        )
+
+        assert self.manager is not None
+        self.manager.add(file_dialog)
 
     def _send_field_value(self, field: ptg.InputField, _: str) -> None:
         """Sends the input field's value.
@@ -127,6 +177,9 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         Args:
             field: The field whose value should be sent.
         """
+
+        if field.value == "":
+            return
 
         self._send_threaded(field.value)
         field.value = ""

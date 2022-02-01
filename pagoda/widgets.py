@@ -152,7 +152,7 @@ def from_signature(
         if param.default == inspect.Signature.empty:
             default = TEMP_DEFAULTS.get(param.name, "")
 
-        field = ptg.InputField(value=default or "")
+        field = ptg.InputField(value=str(default or ""))
         window += get_inputbox(param.name.title(), field)
 
         # Mypy cannot infer type, yet providing it doesn't help.
@@ -163,6 +163,9 @@ def from_signature(
     threaded = Teacup.threaded(
         method, lambda *args, **kwargs: handle_output(window, *args, **kwargs)
     )
+
+    window += ""
+
     window += ptg.Button(
         "Submit!",
         lambda *_: threaded(**{key: value() for key, value in fields.items()}),
