@@ -14,10 +14,17 @@ class PagodaApplication(ABC):
     An application has two important methods, `construct_window` and
     `stop`. All registered applications are instantiated at Pagoda class
     instantiation.
+
+    An application can also parse command line arguments specifically given
+    to it, in the form `pagoda --app <app_id> <args>`. This is done by the
+    `parse_arguments` method, which is an empty stub by default.
     """
 
     title: str
     """The application's title."""
+
+    app_id: str
+    """The applications ID. Use only snake_case lowercase ASCII alphanumerics."""
 
     active_windows: list[ptg.Window]
     """A list of all active windows. **This is updated & tracked by the Application.**"""
@@ -75,3 +82,6 @@ class PagodaApplication(ABC):
         for window in self.active_windows:
             if window in self.manager:
                 window.close()
+
+    def parse_arguments(self, args: list[str]) -> None:
+        """Parses command line arguments provided after `pagoda --app <app_id>`."""

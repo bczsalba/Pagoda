@@ -1,5 +1,7 @@
 """The runtime component of the Pagoda client."""
 
+from __future__ import annotations
+
 import pytermgui as ptg
 
 from . import widgets
@@ -62,7 +64,7 @@ class Pagoda(ptg.WindowManager):
     #       error handler like this would work.
     # applications.ErrorHandler(),
 
-    def __init__(self) -> None:
+    def __init__(self, remaining_args: list[str], app_id: str | None = None) -> None:
         """Initialize application."""
 
         super().__init__()
@@ -91,6 +93,26 @@ class Pagoda(ptg.WindowManager):
         )
 
         self.add(self._menubar)
+
+        if app_id is not None:
+            arg_app = self._find_app_by_id(app_id)
+            arg_app.parse_arguments(remaining_args)
+
+    def _find_app_by_id(self, app_id: str) -> applications.PagodaApplication:
+        """Returns an App by its name.
+
+        Returns:
+            The application with the provided ID.
+
+        Raises:
+            KeyError: No application with the given ID could be found.
+        """
+
+        for app in self.applications:
+            if app.app_id == app_id:
+                return app
+
+        raise KeyError(f'Could not find application by the id "{app_id}".')
 
     def error(
         self, caller: applications.PagodaApplication, content: ptg.Container

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, Any
+from typing import Callable, Any, TYPE_CHECKING
 
 import pytermgui as ptg
 from requests import Response
@@ -12,6 +12,9 @@ from ... import widgets
 from ..application import PagodaApplication
 from .chatroom import ChatroomWindow
 
+if TYPE_CHECKING:
+    from ...runtime import Pagoda
+
 
 class TeahazApplication(PagodaApplication):
     """The TeahazApplication class.
@@ -19,9 +22,12 @@ class TeahazApplication(PagodaApplication):
     This application controls all of the Teahaz API related work.
     """
 
-    title = "Teaház"
+    manager: Pagoda
 
-    def __init__(self, manager: ptg.WindowManager) -> None:
+    title = "Teaház"
+    app_id = "teahaz"
+
+    def __init__(self, manager: Pagoda) -> None:
         """Initializes the TeahazApplication, and its Teacup instance."""
 
         self._cup = Teacup()
@@ -50,9 +56,7 @@ class TeahazApplication(PagodaApplication):
             content += ptg.Label(f"    [italic 243]{key}: [157]{value}", parent_align=0)
         content += ptg.Label("}", parent_align=0)
 
-        # The Pagoda class does have this method, but we cannot correctly type annotate
-        # it without causing cyclic imports.
-        self.manager.error(self, content)  # type: ignore
+        self.manager.error(self, content)
 
     def construct_window(self, **attrs: Any) -> ptg.Window:
         """Constructs a picker for the various ways one can sign into Teahaz."""
