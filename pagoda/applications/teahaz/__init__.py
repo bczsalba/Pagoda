@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
+from argparse import ArgumentParser
 from typing import Callable, Any, TYPE_CHECKING
 
 import pytermgui as ptg
 from requests import Response
-from teahaz import Teacup, Chatroom, Message, Event, SystemEvent
+from teahaz import Teacup, Chatroom, Message, Event, SystemEvent, Invite
 
 from ... import widgets
 from ..application import PagodaApplication
@@ -136,3 +138,53 @@ class TeahazApplication(PagodaApplication):
 
         self._cup.stop()
         super().stop()
+
+    def parse_arguments(self, args: list[str]) -> None:
+        """Parses given arguments."""
+
+        def _use_invite(invite: Invite, username: str, password: str) -> None:
+            """Uses an invite."""
+
+            chatroom = self._cup.use_invite(invite, username, password)
+            if chatroom is None:
+                return
+
+            window = ChatroomWindow(chatroom, self._cup)
+            self.active_windows.append(window)
+            self.manager.add(window)
+
+        parser = ArgumentParser(
+            prog="Teaház", description="The Pagoda Teaház application."
+        )
+
+        parser.add_argument(
+            "-i",
+            "--invite",
+            metavar=("file"),
+            help="Consumes an invite from the given file path.",
+        )
+
+        namespace = parser.parse_args(args)
+
+        if namespace.invite is None:
+            return
+
+        with open(namespace.invite, "r", encoding="utf-8") as inv_file:
+            invite = Invite.from_dict(json.load(inv_file))
+
+        username_field = ptg.InputField()
+        password_field = ptg.InputField()
+        self.manager.add(
+            ptg.Window()
+            + "[title]Register to a new chatroom!"
+            + ""
+            + widgets.get_inputbox("Username", username_field)
+            + widgets.get_inputbox("Password", password_field)
+            + ""
+            + [
+                "Submit!",
+                lambda *_: _use_invite(
+                    invite, username_field.value, password_field.value
+                ),
+            ]
+        )
