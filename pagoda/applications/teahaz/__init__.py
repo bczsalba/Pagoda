@@ -32,6 +32,12 @@ class TeahazApplication(PagodaApplication):
     def __init__(self, manager: Pagoda) -> None:
         """Initializes the TeahazApplication, and its Teacup instance."""
 
+        ptg.markup.alias("teahaz-chatroom_name", "bold 210")
+        ptg.markup.alias("teahaz-channel_name", "202")
+        ptg.markup.alias("teahaz-default_username", "210 bold")
+        ptg.markup.alias("teahaz-message", "")
+        ptg.markup.alias("teahaz-timestamp", "bold 72")
+
         self._cup = Teacup()
         self._cup.subscribe_all(Event.ERROR, self._error)
 
@@ -175,7 +181,8 @@ class TeahazApplication(PagodaApplication):
         username_field = ptg.InputField()
         password_field = ptg.InputField()
         self.manager.add(
-            ptg.Window()
+            self._get_base_window()
+            + ""
             + "[title]Register to a new chatroom!"
             + ""
             + widgets.get_inputbox("Username", username_field)

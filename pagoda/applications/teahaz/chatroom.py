@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from datetime import datetime
 from dataclasses import asdict
 
 import pytermgui as ptg
-from teahaz import Teacup, Chatroom, Message, Event, SystemEvent, Invite
+from teahaz import Teacup, Chatroom, Message, Event, Invite
 
 from ... import widgets
 
@@ -15,55 +16,91 @@ from ... import widgets
 class MessageBox(ptg.Container):
     """A message box."""
 
-    overflow = ptg.Overflow.RESIZE
+    # TODO: Currently, once messages are grouped together there
+    #       is no way to ungroup them. This should be fine, but
+    #       we shall see.
 
-    def __init__(self, message: Message, **attrs: Any) -> None:
-        """Initializes message box.
+    def __init__(self, *messages: Message, **attrs) -> None:
+        """Initializes a MessageBox.
+
+        This widget only calculates changes if its size changed
+        or new messages were added for perfomance reasons.
+
+        It also assumes all messages come from the same author,
+        and within a certain amount of time. This is handled by
+        ChatroomWindow.
+
         Args:
-            message: The message to display. Can be get/set using
-                self.message.
+            *messages: The messages this box will display.
         """
+
+        self._cached_lines: list[str] = []
 
         super().__init__(**attrs)
-        self.message = message
+
         self.relative_width = 0.4
+        self.box = ptg.boxes.EMPTY
 
-    @property
-    def message(self) -> Message:
-        """Set the currently displayed message.
-        Args:
-            new: The new message to display.
-        Returns:
-            The current message.
-        """
+        self._messages = []
+        for message in messages:
+            self._messages.append(message)
 
-        return self._message
+        self.update()
 
-    @message.setter
-    def message(self, new: Message) -> None:
-        """Set a new message."""
+    def add_message(self, message: Message) -> None:
+        """Adds a new message."""
 
-        self._message = new
+        self._messages.append(message)
+        self.update()
 
-        if new.message_type == "system":
-            assert isinstance(new.data, SystemEvent)
-            self._add_widget(ptg.Label("[245 italic]-- " + new.data.event_type + " --"))
-            return
-
-        # Just to calm mypy down.
-        assert isinstance(new.data, str)
-
-        assert new.username
+    def update(self) -> None:
+        """Updates box content."""
 
         self._widgets = []
-        self._add_widget(
-            ptg.Label("[157 bold]" + new.username, parent_align=self.parent_align)
-        )
-        self._add_widget("")
-        self._add_widget(ptg.Label(new.data, parent_align=self.parent_align))
-        self._add_widget("")
-        self._add_widget(ptg.Label(str(new.send_time), parent_align=self.parent_align))
-        self.get_lines()
+        total = len(self._messages)
+
+        for i, message in enumerate(self._messages):
+            # This shouldn't happen
+            if message.message_type.startswith("system"):
+                continue
+
+            if i > 0:
+                self._add_widget("")
+
+            show_name = i == 0
+            show_time = i == total - 1
+
+            if show_name:
+                self._add_widget(
+                    ptg.Label(
+                        "[teahaz-default_username]" + str(message.username),
+                        parent_align=self.parent_align,
+                    )
+                )
+
+            data = "<file>" if not isinstance(message.data, str) else message.data
+
+            if i == self.selected_index:
+                data = "[inverse]" + data
+
+            self._add_widget(ptg.Label(data, parent_align=self.parent_align))
+
+            if show_time:
+                time = datetime.fromtimestamp(message.send_time).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+                self._add_widget(
+                    ptg.Label(
+                        "[teahaz-timestamp]" + time, parent_align=self.parent_align
+                    )
+                )
+
+        self._cached_lines = super().get_lines()
+
+    def get_lines(self) -> list[str]:
+        """Returns cached lines when possible, only updates content when size was changed."""
+
+        return self._cached_lines
 
 
 class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attributes
@@ -95,7 +132,7 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         self._conv_box.box = ptg.boxes.Box(
             [
                 "   ",
-                "x",
+                " x ",
                 "   ",
             ]
         )
@@ -107,10 +144,16 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         # Messages that have been sent, but not yet received back
         self._sent_messages: list[tuple[str, MessageBox]] = []
 
+        self._previous_msg: Message | None = None
+        self._previous_msg_box: MessageBox | None = None
+
         self._old_size = (self.width, self.height)
         self._old_height_sum = self._get_height_sum()
 
-        self._add_widget(widgets.Header(str(self.chatroom.name)))
+        self._header = widgets.Header(
+            "[teahaz-chatroom_name]" + str(self.chatroom.name)
+        )
+        self._add_widget(self._header)
         self._add_widget(
             widgets.Menubar(
                 [
@@ -131,9 +174,7 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         field.bind(ptg.keys.RETURN, self._send_field_value)
 
         self._add_widget(widgets.get_inputbox("Message", field=field))
-        self.height = 30
-
-        self.chatroom.send("hello world!")
+        self.height = int(4 * ptg.terminal.height / 5)
 
     def _write_invite(self, caller: ptg.Window, invite: Invite | None) -> None:
         """Writes the invite to a file."""
@@ -208,6 +249,7 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         box.set_style("corner", style)
 
         self._conv_box += box
+        box.update()
         self._sent_messages.append((message.uid, box))
 
     def add_message(self, message: Message) -> None:
@@ -217,17 +259,34 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
             message: The teahaz Message instance.
         """
 
-        box = MessageBox(
-            message,
-            parent_align=(2 if message.username == self.chatroom.username else 0),
-        )
-
         for i, (uid, sent_box) in enumerate(self._sent_messages):
             if uid == message.uid:
                 self._conv_box.remove(sent_box)
                 self._sent_messages.pop(i)
 
+        prev = self._previous_msg
+        self._previous_msg = message
+
+        should_group = (
+            prev is not None
+            and prev.username == message.username
+            and message.send_time - prev.send_time < 600
+        )
+
+        if should_group and self._previous_msg_box is not None:
+            self._previous_msg_box.add_message(message)
+            return
+
+        box = MessageBox(
+            message,
+            parent_align=(2 if message.username == self.chatroom.username else 0),
+        )
+
         self._conv_box += box
+        box.update()
+
+        self._previous_msg_box = box
+        return
 
     def get_lines(self) -> list[str]:
         """ "Updates self._conv_box size before returning super().get_lines()."""
