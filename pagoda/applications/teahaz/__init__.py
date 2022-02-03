@@ -43,7 +43,7 @@ class TeahazApplication(PagodaApplication):
         """Initializes the TeahazApplication, and its Teacup instance."""
 
         ptg.markup.alias("teahaz-chatroom_name", "bold 210")
-        ptg.markup.alias("teahaz-channel_name", "202")
+        ptg.markup.alias("teahaz-channel_name", "bold 72")
         ptg.markup.alias("teahaz-default_username", "210 bold")
         ptg.markup.alias("teahaz-message", "")
         ptg.markup.alias("teahaz-unsent_message", "240")

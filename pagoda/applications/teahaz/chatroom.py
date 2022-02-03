@@ -168,7 +168,10 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         self._old_height_sum = self._get_height_sum()
 
         self._header = widgets.Header(
-            "[teahaz-chatroom_name]" + str(self.chatroom.name)
+            "[teahaz-chatroom_name]"
+            + str(self.chatroom.name)
+            + "[/] - [teahaz-channel_name]"
+            + str(self.chatroom.active_channel.name)
         )
         self._add_widget(self._header)
         self._add_widget(self.conv_box)
