@@ -20,6 +20,9 @@ class MessageBox(ptg.Container):
     #       is no way to ungroup them. This should be fine, but
     #       we shall see.
 
+    is_unsent = False
+    """Shows that this message has not yet been sent."""
+
     def __init__(self, *messages: Message, **attrs) -> None:
         """Initializes a MessageBox.
 
@@ -67,8 +70,8 @@ class MessageBox(ptg.Container):
             if i > 0:
                 self._add_widget("")
 
-            show_name = i == 0
-            show_time = i == total - 1
+            show_name = i == 0 and not self.is_unsent
+            show_time = i == total - 1 and not self.is_unsent
 
             if show_name:
                 self._add_widget(
@@ -79,6 +82,12 @@ class MessageBox(ptg.Container):
                 )
 
             data = "<file>" if not isinstance(message.data, str) else message.data
+
+            if self.is_unsent:
+                self._add_widget("")
+                data = "[teahaz-unsent_message]" + data
+            else:
+                data = "[teahaz-message]" + data
 
             if i == self.selected_index:
                 data = "[inverse]" + data
@@ -242,6 +251,7 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         box = MessageBox(
             message,
             parent_align=(2 if message.username == self.chatroom.username else 0),
+            is_unsent=True,
         )
 
         style = ptg.MarkupFormatter("[240]{item}")

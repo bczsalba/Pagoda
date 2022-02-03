@@ -36,6 +36,7 @@ class TeahazApplication(PagodaApplication):
         ptg.markup.alias("teahaz-channel_name", "202")
         ptg.markup.alias("teahaz-default_username", "210 bold")
         ptg.markup.alias("teahaz-message", "")
+        ptg.markup.alias("teahaz-unsent_message", "240")
         ptg.markup.alias("teahaz-timestamp", "bold 72")
 
         self._cup = Teacup()
