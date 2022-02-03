@@ -164,20 +164,6 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
             "[teahaz-chatroom_name]" + str(self.chatroom.name)
         )
         self._add_widget(self._header)
-        self._add_widget(
-            widgets.Menubar(
-                [
-                    "Create invite",
-                    lambda *_: self.manager.add(
-                        widgets.from_signature(
-                            self.chatroom.create_invite, self._write_invite
-                        )
-                    )
-                    if self.manager is not None
-                    else None,
-                ]
-            )
-        )
         self._add_widget(self._conv_box)
 
         field = ptg.InputField()
