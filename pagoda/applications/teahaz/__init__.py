@@ -21,7 +21,8 @@ if TYPE_CHECKING:
     from ...runtime import Pagoda
 
 
-SAVE_ROOT = Path("/Users/lapis/.config/pagoda/save_data/teahaz/")
+# TODO: This very much does not support windows
+SAVE_ROOT = Path.home() / ".config/pagoda/save_data/teahaz/"
 
 
 class TeahazApplication(PagodaApplication):
@@ -34,6 +35,9 @@ class TeahazApplication(PagodaApplication):
 
     title = "Teaház"
     app_id = "teahaz"
+
+    do_restore = True
+    """Restoring saved chatrooms can be force-disabled using the `--no-restore` flag."""
 
     def __init__(self, manager: Pagoda) -> None:
         """Initializes the TeahazApplication, and its Teacup instance."""
@@ -53,10 +57,14 @@ class TeahazApplication(PagodaApplication):
     def start(self) -> None:
         """Restores save state."""
 
-        self._restore()
+        if self.do_restore:
+            self._restore()
 
     def _restore(self) -> None:
         """Restores chatrooms from save data."""
+
+        if not os.path.exists(SAVE_ROOT):
+            return
 
         self._cup = Teacup().from_dump(SAVE_ROOT)
 
@@ -171,9 +179,13 @@ class TeahazApplication(PagodaApplication):
     def stop(self) -> None:
         """Terminate all cup processes."""
 
-        self._cup.dump_to(SAVE_ROOT)
-        self._cup.stop()
+        if self.do_restore and not os.name == "nt":
+            if not SAVE_ROOT.exists():
+                os.makedirs(SAVE_ROOT)
 
+            self._cup.dump_to(SAVE_ROOT)
+
+        self._cup.stop()
         super().stop()
 
     def parse_arguments(self, args: list[str]) -> None:
@@ -201,7 +213,14 @@ class TeahazApplication(PagodaApplication):
             help="Consumes an invite from the given file path.",
         )
 
+        parser.add_argument(
+            "--no-restore",
+            action="store_true",
+            help="Run without restoring previously saved chatrooms. Also disables saving.",
+        )
+
         namespace = parser.parse_args(args)
+        self.do_restore = not namespace.no_restore
 
         if namespace.invite is None:
             return
