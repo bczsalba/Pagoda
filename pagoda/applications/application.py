@@ -59,6 +59,9 @@ class PagodaApplication(ABC):
             An application window.
         """
 
+    def start(self) -> None:
+        """Starts the application when Pagoda has initialized."""
+
     def close(self, window: ptg.Window) -> None:
         """Closes given window, while also removing it from our active_windows.
 

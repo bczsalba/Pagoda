@@ -98,6 +98,9 @@ class Pagoda(ptg.WindowManager):
             arg_app = self._find_app_by_id(app_id)
             arg_app.parse_arguments(remaining_args)
 
+        for starting_app in self.applications:
+            starting_app.start()
+
     def _find_app_by_id(self, app_id: str) -> applications.PagodaApplication:
         """Returns an App by its name.
 
