@@ -50,12 +50,19 @@ class MessageBox(ptg.Container):
 
         self.update()
 
-    def add_message(self, message: Message) -> None:
-        """Adds a new message."""
+    def add_message(self, message: Message, do_update: bool = True) -> None:
+        """Adds a new message.
+
+        Args:
+            do_update: Determines whether self.update() should be called
+                after adding a message.
+        """
 
         self._messages.append(message)
         self._messages.sort(key=lambda msg: msg.send_time)
-        self.update()
+
+        if do_update:
+            self.update()
 
     def update(self) -> None:
         """Updates box content."""
@@ -136,10 +143,10 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         self.cup = cup
         self._send_threaded = self.cup.threaded(self.chatroom.send)
 
-        self._conv_box = ptg.Container(
+        self.conv_box = ptg.Container(
             height=25, overflow=ptg.Overflow.SCROLL, vertical_align=0
         )
-        self._conv_box.box = ptg.boxes.Box(
+        self.conv_box.box = ptg.boxes.Box(
             [
                 "   ",
                 " x ",
@@ -164,7 +171,7 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
             "[teahaz-chatroom_name]" + str(self.chatroom.name)
         )
         self._add_widget(self._header)
-        self._add_widget(self._conv_box)
+        self._add_widget(self.conv_box)
 
         field = ptg.InputField()
         field.bind(ptg.keys.RETURN, self._send_field_value)
@@ -225,7 +232,7 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         """Calculates the sum of non-self._convbox widget heights."""
 
         return sum(
-            widget.height for widget in self._widgets if widget is not self._conv_box
+            widget.height for widget in self._widgets if widget is not self.conv_box
         )
 
     def _add_sent_message(self, message: Message) -> None:
@@ -245,11 +252,11 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         box.set_style("border", style)
         box.set_style("corner", style)
 
-        self._conv_box += box
+        self.conv_box += box
         box.update()
         self._sent_messages.append((message.uid, box))
 
-    def add_message(self, message: Message) -> None:
+    def add_message(self, message: Message, do_update: bool = True) -> None:
         """Adds a message to the window.
         This is called as a callback for self.cup.
         Args:
@@ -258,7 +265,7 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
 
         for i, (uid, sent_box) in enumerate(self._sent_messages):
             if uid == message.uid:
-                self._conv_box.remove(sent_box)
+                self.conv_box.remove(sent_box)
                 self._sent_messages.pop(i)
 
         prev = self._previous_msg
@@ -271,7 +278,7 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         )
 
         if should_group and self._previous_msg_box is not None:
-            self._previous_msg_box.add_message(message)
+            self._previous_msg_box.add_message(message, do_update)
             return
 
         box = MessageBox(
@@ -279,21 +286,20 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
             parent_align=(2 if message.username == self.chatroom.username else 0),
         )
 
-        self._conv_box += box
-        box.update()
+        self.conv_box += box
 
         self._previous_msg_box = box
         return
 
     def get_lines(self) -> list[str]:
-        """ "Updates self._conv_box size before returning super().get_lines()."""
+        """ "Updates self.conv_box size before returning super().get_lines()."""
 
         height_sum = self._get_height_sum()
         if (
             not height_sum == self._old_height_sum
             or not (self.width, self.height) == self._old_size
         ):
-            self._conv_box.height = self.height - 2 - height_sum
+            self.conv_box.height = self.height - 2 - height_sum
             self._old_size = (self.width, self.height)
 
         return super().get_lines()

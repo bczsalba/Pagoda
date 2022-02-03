@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import json
+import shutil
+import pickle
+from pathlib import Path
+from dataclasses import asdict
 from argparse import ArgumentParser
 from typing import Callable, Any, TYPE_CHECKING
 
@@ -16,6 +21,9 @@ from .chatroom import ChatroomWindow
 
 if TYPE_CHECKING:
     from ...runtime import Pagoda
+
+
+SAVE_ROOT = Path("/Users/lapis/.config/pagoda/save_data/teahaz/")
 
 
 class TeahazApplication(PagodaApplication):
@@ -43,6 +51,28 @@ class TeahazApplication(PagodaApplication):
         self._cup.subscribe_all(Event.ERROR, self._error)
 
         super().__init__(manager)
+
+    def start(self) -> None:
+        """Restores save state."""
+
+        self._restore()
+
+    def _restore(self) -> None:
+        """Restores chatrooms from save data."""
+
+        self._cup = Teacup().from_dump(SAVE_ROOT)
+
+        for chat in self._cup.chatrooms:
+            window = ChatroomWindow(chat, self._cup)
+
+            for message in chat.messages:
+                window.add_message(message, False)
+
+            self.manager.add(window)
+            self.active_windows.append(window)
+
+            for box in window.conv_box:
+                box.update()
 
     def _error(
         self, response: Response, method: str, req_kwargs: dict[str, Any]
@@ -143,7 +173,9 @@ class TeahazApplication(PagodaApplication):
     def stop(self) -> None:
         """Terminate all cup processes."""
 
+        self._cup.dump_to(SAVE_ROOT)
         self._cup.stop()
+
         super().stop()
 
     def parse_arguments(self, args: list[str]) -> None:

@@ -8,6 +8,11 @@ import pytermgui as ptg
 from ..widgets import Header
 
 
+# TODO: This can house things like Teahaz/grouping_max_time n stuff
+# class ConfigManager:
+#     """A manager class for Pagoda Application configurations."""
+
+
 class PagodaApplication(ABC):
     """The superclass of all Pagoda applications.
 
