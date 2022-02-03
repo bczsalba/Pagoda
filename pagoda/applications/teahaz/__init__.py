@@ -78,7 +78,8 @@ class TeahazApplication(PagodaApplication):
             self.active_windows.append(window)
 
             for box in window.conv_box:
-                box.update()
+                if hasattr(box, "update"):
+                    box.update()
 
     def _error(
         self, response: Response, method: str, req_kwargs: dict[str, Any]

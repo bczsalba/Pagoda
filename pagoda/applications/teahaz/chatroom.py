@@ -286,6 +286,8 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
             parent_align=(2 if message.username == self.chatroom.username else 0),
         )
 
+        self.conv_box += ""
+        self.conv_box += ""
         self.conv_box += box
 
         self._previous_msg_box = box
