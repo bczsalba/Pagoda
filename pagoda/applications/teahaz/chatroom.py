@@ -54,6 +54,7 @@ class MessageBox(ptg.Container):
         """Adds a new message."""
 
         self._messages.append(message)
+        self._messages.sort(key=lambda msg: msg.send_time)
         self.update()
 
     def update(self) -> None:
