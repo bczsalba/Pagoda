@@ -15,7 +15,7 @@ from teahaz import Teacup, Chatroom, Message, Event, SystemEvent, Invite
 
 from ... import widgets
 from ..application import PagodaApplication
-from .chatroom import ChatroomWindow
+from .chatroom import ChatroomWindow, MessageBox
 
 if TYPE_CHECKING:
     from ...runtime import Pagoda
@@ -49,24 +49,29 @@ class TeahazApplication(PagodaApplication):
         ptg.markup.alias("teahaz-unsent_message", "240")
         ptg.markup.alias("teahaz-timestamp", "bold 72")
 
-        self._cup = Teacup()
-        self._cup.subscribe_all(Event.ERROR, self._error)
+        self._previous_exception: Exception | None = None
+
+        self._cup: Teacup
 
         super().__init__(manager)
+
+    @staticmethod
+    def _restore() -> Teacup | None:
+        """Restores chatrooms from save data."""
+
+        if not os.path.exists(SAVE_ROOT):
+            return None
+
+        return Teacup().from_dump(SAVE_ROOT)
 
     def start(self) -> None:
         """Restores save state."""
 
-        if self.do_restore:
-            self._restore()
+        # This is always going to evaluate to a Teacup.
+        self._cup = self._restore() if self.do_restore else Teacup()  # type: ignore
 
-    def _restore(self) -> None:
-        """Restores chatrooms from save data."""
-
-        if not os.path.exists(SAVE_ROOT):
-            return
-
-        self._cup = Teacup().from_dump(SAVE_ROOT)
+        self._cup.subscribe_all(Event.ERROR, self._error)
+        self._cup.subscribe_all(Event.NETWORK_EXCEPTION, self._error)
 
         for chat in self._cup.chatrooms:
             window = ChatroomWindow(chat, self._cup)
@@ -78,31 +83,52 @@ class TeahazApplication(PagodaApplication):
             self.active_windows.append(window)
 
             for box in window.conv_box:
-                if hasattr(box, "update"):
+                if isinstance(box, MessageBox):
                     box.update()
 
     def _error(
-        self, response: Response, method: str, req_kwargs: dict[str, Any]
+        self, result: Response | Exception, method: str, req_kwargs: dict[str, Any]
     ) -> None:
         """Passes information to ErrorHandler application."""
 
-        content = ptg.Container(
-            {
-                "[error-key]Error:": "[error-value]" + str(response.json()),
-            },
-            {
-                "[error-key]Method:": "[error-value]" + method.upper(),
-            },
-        )
+        def _expand_body(body) -> ptg.Container:
+            """Gets the body of the error window."""
 
-        content.box = ptg.boxes.SINGLE
+            if isinstance(result, Response):
+                body += ptg.Label("[72 bold]request_arguments[/] = {", parent_align=0)
+                if isinstance(result, Response):
+                    for key, value in {**req_kwargs, "url": result.url}.items():
+                        body += ptg.Label(
+                            f"    [italic 243]{key}: [157]{value}", parent_align=0
+                        )
+                    body += ptg.Label("}", parent_align=0)
 
-        content += ptg.Label("[72 bold]request_arguments[/] = {", parent_align=0)
-        for key, value in {**req_kwargs, "url": response.url}.items():
-            content += ptg.Label(f"    [italic 243]{key}: [157]{value}", parent_align=0)
-        content += ptg.Label("}", parent_align=0)
+            else:
+                body += ptg.Label("[72 bold]Exception details:")
+                body += ptg.Label(str(result))
 
-        self.manager.error(self, content)
+            return body
+
+        if isinstance(result, Response):
+            result_text = result.json()
+
+        else:
+            if type(self._previous_exception).__name__ == type(result).__name__:
+                return
+
+            self._previous_exception = result
+            result_text = type(result).__name__
+
+        body = ptg.Container()
+        for key, value in {
+            "[error-key]Error:": "[error-value]" + result_text,
+            "[error-key]Method:": "[error-value]" + method.upper(),
+        }.items():
+            body += {key: value}
+
+        body.box = ptg.boxes.SINGLE
+
+        self.manager.error(self, _expand_body(body))
 
     def construct_window(self, **attrs: Any) -> ptg.Window:
         """Constructs a picker for the various ways one can sign into Teahaz."""

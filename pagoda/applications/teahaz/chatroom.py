@@ -167,6 +167,7 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         self._old_size = (self.width, self.height)
         self._old_height_sum = self._get_height_sum()
 
+        assert self.chatroom.active_channel is not None
         self._header = widgets.Header(
             "[teahaz-chatroom_name]"
             + str(self.chatroom.name)
@@ -220,7 +221,9 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
 
     def _send_field_value(self, field: ptg.InputField, _: str) -> None:
         """Sends the input field's value.
+
         This method uses self._send_threaded to send the message under a thread.
+
         Args:
             field: The field whose value should be sent.
         """
@@ -240,7 +243,9 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
 
     def _add_sent_message(self, message: Message) -> None:
         """Adds a message to the window.
+
         This is called as a callback for self.cup.
+
         Args:
             message: The teahaz Message instance.
         """
@@ -261,7 +266,9 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
 
     def add_message(self, message: Message, do_update: bool = True) -> None:
         """Adds a message to the window.
+
         This is called as a callback for self.cup.
+
         Args:
             message: The teahaz Message instance.
         """
