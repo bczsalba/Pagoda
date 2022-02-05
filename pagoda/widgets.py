@@ -120,6 +120,106 @@ class Header(ptg.Container):
         self._label.value = new
 
 
+class ToggleSection(ptg.Container):
+    """A toggleable "section"."""
+
+    chars = {
+        "indicator_open": "▼ ",
+        "indicator_closed": "▶ ",
+    }
+
+    parent_align = ptg.HorizontalAlignment.LEFT
+
+    def __init__(self, title: str | ptg.Widget, **attrs) -> None:
+        """Initializes a ToggleSection.
+
+        Args:
+            title: The title that will be visible regardless of toggle
+                state.
+        """
+
+        self._is_expanded = False
+        self._ignore_mouse = False
+
+        super().__init__(**attrs)
+
+        self.title = title
+        self._add_widget(title)
+        self._widgets.insert(0, self._widgets.pop())
+
+    @property
+    def sidelength(self) -> int:
+        """Returns 0."""
+
+        return 0
+
+    def __iadd__(self, other: object) -> ToggleSection:
+        """Adds other, returns self."""
+
+        super().__iadd__(other)
+        return self
+
+    def toggle(self) -> None:
+        """Toggles self._is_expanded."""
+
+        self._is_expanded = not self._is_expanded
+
+    def get_lines(self) -> list[str]:
+        """Gets a list of lines depending on self._is_expanded."""
+
+        if len(self._widgets) == 0:
+            return []
+
+        char = self._get_char(
+            "indicator_" + ("open" if self._is_expanded else "closed")
+        )
+        assert isinstance(char, str)
+
+        title = self._widgets[0]
+        assert isinstance(title, ptg.Label)
+
+        old_value = title.value
+        title.value = char + old_value
+        lines = self._widgets[0].get_lines()
+        title.value = old_value
+
+        if self._is_expanded:
+            for widget in self._widgets[1:]:
+                align, offset = self._get_aligners(widget, ("", ""))
+                self._update_width(widget)
+
+                widget.pos = self.pos[0] + offset, self.pos[1] + len(lines)
+                for line in widget.get_lines():
+                    lines.append(align(line))
+
+        self.height = len(lines)
+        return lines
+
+    def handle_mouse(self, event: ptg.MouseEvent) -> bool:
+        """Handles a mouse event.
+
+        Clicking on the title will toggle the widgets contained within,
+        and interacting anywhere else will be passed to the children.
+
+        Args:
+            event: The event to handle.
+        """
+
+        if (
+            event.action is ptg.MouseAction.LEFT_CLICK
+            and event.position[1] == self.pos[1]
+        ):
+            self.toggle()
+            self._ignore_mouse = True
+            return False
+
+        if self._ignore_mouse or not self._is_expanded:
+            self._ignore_mouse = False
+            return False
+
+        return super().handle_mouse(event)
+
+
 def from_signature(
     method: Callable[..., Any], handle_output: Callable[..., Any]
 ) -> ptg.Window:
