@@ -8,7 +8,7 @@ from datetime import datetime
 from dataclasses import asdict
 
 import pytermgui as ptg
-from teahaz import Teacup, Chatroom, Message, Event, Invite
+from teahaz import Teacup, Chatroom, Message, Event, Invite, Channel
 
 from ... import widgets
 
@@ -136,6 +136,8 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         sets up its bindings and does some other things that I
         cannot think of at the moment."""
 
+        super().__init__(**attrs)
+
         self.chatroom = chatroom
         self.chatroom.subscribe(Event.MSG_NEW, self.add_message)
         self.chatroom.subscribe(Event.MSG_SENT, self._add_sent_message)
@@ -154,7 +156,6 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
             ]
         )
 
-        super().__init__(**attrs)
         self.box = ptg.boxes.DOUBLE
         self.width = 100
 
@@ -181,7 +182,101 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         field.bind(ptg.keys.RETURN, self._send_field_value)
 
         self._add_widget(widgets.get_inputbox("Message", field=field))
+
+        self.bind(ptg.keys.CTRL_T, self._show_util_window)
         self.height = int(4 * ptg.terminal.height / 5)
+
+    def _switch_channel(self, channel: Channel, caller: ptg.Window) -> None:
+        """Switches self.chatroom to new channel, updates header.
+
+        Args:
+            channel: The new channel.
+        """
+
+        self.chatroom.active_channel = channel
+
+        # TODO: The default label is kept in cache.
+        self._header.label = (
+            "[teahaz-chatroom_name]"
+            + str(self.chatroom.name)
+            + "[/] - [teahaz-channel_name]"
+            + str(self.chatroom.active_channel.name)
+        )
+
+        self.conv_box.set_widgets([])
+        for message in self.chatroom.messages:
+            if not message.channel_id == channel.uid:
+                continue
+
+            self.add_message(message)
+
+        caller.close()
+
+    def _show_util_window(self, _: ptg.Window, __: str) -> None:
+        """Shows (adds to manager) a Chatroom utility window.
+
+        The arguments can be disregarded: First argument is a redundant reference
+        to self, the second is the key that triggered this binding. Neither of
+        which are important to us.
+        """
+
+        def _confirm_switch(caller: ptg.Window, channel: Channel) -> None:
+            """Confirms user wanting to switch to newly created channel."""
+
+            caller.close()
+            window: ptg.Window
+            window = ptg.Window(
+                widgets.Header("[title]New chatroom created!"),
+                "",
+                "Would you like to switch to it?",
+                "",
+                ptg.Splitter(
+                    ["Yes!", lambda *_: self._switch_channel(channel, window)],
+                    ["No", lambda *_: window.close()],
+                ),
+                is_modal=True,
+            )
+
+            assert self.manager is not None
+            self.manager.add(window)
+
+        def _create_channel(_: ptg.Window) -> None:
+            """Creates a channel."""
+
+            window = widgets.from_signature(
+                self.chatroom.create_channel, _confirm_switch, is_modal=True
+            )
+
+            assert self.manager is not None
+            self.manager.add(window)
+
+        window = ptg.Window(
+            widgets.Header("[title]Chatroom utilities"),
+            "",
+            width=ptg.terminal.width // 2,
+            is_modal=True,
+            overflow=ptg.Overflow.RESIZE,
+            vertical_align=ptg.VerticalAlignment.TOP,
+        )
+
+        channels = widgets.ToggleSection("[title]Channels")
+        channels.toggle()
+        for channel in self.chatroom.channels:
+            prefix = "[72]" if self.chatroom.active_channel is channel else ""
+            # TODO: These would be much cleaner as clickable text
+            channels += {
+                (prefix + channel.name): [
+                    "Switch",
+                    lambda *_, window=window, channel=channel: self._switch_channel(
+                        channel, window
+                    ),
+                ]
+            }
+        channels += ["Create...", _create_channel]
+        window += channels + ""
+
+        assert self.manager is not None
+        self.manager.add(window)
 
     def _write_invite(self, caller: ptg.Window, invite: Invite | None) -> None:
         """Writes the invite to a file."""
