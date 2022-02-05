@@ -221,7 +221,9 @@ class ToggleSection(ptg.Container):
 
 
 def from_signature(
-    method: Callable[..., Any], handle_output: Callable[..., Any]
+    method: Callable[..., Any],
+    handle_output: Callable[..., Any] | None = None,
+    **attrs: Any
 ) -> ptg.Window:
     """Creates a window from a function signature.
 
@@ -233,7 +235,7 @@ def from_signature(
         A window with InputFields for all parameters for the method.
     """
 
-    window = ptg.Window(width=70)
+    window = ptg.Window(width=70, **attrs)
     window += Header("[title]" + method.__name__.title().replace("_", " "))
     window += ""
 
@@ -261,7 +263,10 @@ def from_signature(
     # Create submission button
     # TODO: This should open a loader modal.
     threaded = Teacup.threaded(
-        method, lambda *args, **kwargs: handle_output(window, *args, **kwargs)
+        method,
+        lambda *args, **kwargs: handle_output(window, *args, **kwargs)
+        if handle_output
+        else None,
     )
 
     window += ""
