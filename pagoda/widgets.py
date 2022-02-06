@@ -176,11 +176,15 @@ class ToggleSection(ptg.Container):
         assert isinstance(char, str)
 
         title = self._widgets[0]
-        assert isinstance(title, ptg.Label)
+        assert isinstance(title, ptg.Label), (title, type(title))
+
+        self._update_width(title)
 
         old_value = title.value
         title.value = char + old_value
-        lines = self._widgets[0].get_lines()
+
+        align, _ = self._get_aligners(title, ("", ""))
+        lines = [align(line) for line in self._widgets[0].get_lines()]
         title.value = old_value
 
         if self._is_expanded:
@@ -192,7 +196,11 @@ class ToggleSection(ptg.Container):
                 for line in widget.get_lines():
                     lines.append(align(line))
 
-        self.height = len(lines)
+        self.height = max(self.height, len(lines))
+        extra = self.height - len(lines)
+        for _ in range(extra):
+            lines.append("")
+
         return lines
 
     def handle_mouse(self, event: ptg.MouseEvent) -> bool:
