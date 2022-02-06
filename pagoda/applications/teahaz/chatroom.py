@@ -225,6 +225,7 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
 
             caller.close()
             window: ptg.Window
+
             window = ptg.Window(
                 widgets.Header("[title]New chatroom created!"),
                 "",
@@ -255,9 +256,17 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
             "",
             width=ptg.terminal.width // 2,
             is_modal=True,
-            overflow=ptg.Overflow.RESIZE,
+        )
+
+        body = ptg.Container(
+            overflow=ptg.Overflow.SCROLL,
+            height=15,
             vertical_align=ptg.VerticalAlignment.TOP,
         )
+
+        body.box = ptg.boxes.EMPTY
+
+        window += body
 
         channels = widgets.ToggleSection("[title]Channels")
         channels.toggle()
@@ -273,7 +282,7 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
                 ]
             }
         channels += ["Create...", _create_channel]
-        window += channels + ""
+        body += channels + ""
 
         assert self.manager is not None
         self.manager.add(window)
