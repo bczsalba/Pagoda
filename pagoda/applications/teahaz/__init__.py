@@ -180,16 +180,20 @@ class TeahazApplication(PagodaApplication):
             section.toggle()
             return section
 
-        window = (
-            self._get_base_window(overflow=ptg.Overflow.RESIZE, **attrs)
-            + ""
-            + ptg.Button("Create a chatroom", _get_runner(self._cup.create_chatroom))
-            + ptg.Button("Log into a chatroom", _get_runner(self._cup.login))
-            + ""
+        body = ptg.Container(
+            "",
+            ptg.Button("Create a chatroom", _get_runner(self._cup.create_chatroom)),
+            ptg.Button("Log into a chatroom", _get_runner(self._cup.login)),
+            "",
+            height=15,
+            overflow=ptg.Overflow.SCROLL,
+            vertical_align=ptg.VerticalAlignment.TOP,
         )
 
-        window += _get_chatroom_toggle(window)
-        window += ""
+        body.box = ptg.boxes.EMPTY
+
+        window = self._get_base_window(**attrs) + body
+        body += _get_chatroom_toggle(window)
 
         self.active_windows.append(window)
 
