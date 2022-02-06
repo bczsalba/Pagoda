@@ -196,10 +196,7 @@ class ToggleSection(ptg.Container):
                 for line in widget.get_lines():
                     lines.append(align(line))
 
-        self.height = max(self.height, len(lines))
-        extra = self.height - len(lines)
-        for _ in range(extra):
-            lines.append("")
+        self.height = len(lines)
 
         return lines
 
