@@ -73,18 +73,28 @@ class TeahazApplication(PagodaApplication):
         self._cup.subscribe_all(Event.ERROR, self._error)
         self._cup.subscribe_all(Event.NETWORK_EXCEPTION, self._error)
 
-        for chat in self._cup.chatrooms:
-            window = ChatroomWindow(chat, self._cup)
+    def _add_chatroom_window(self, caller: ptg.Window, chatroom: Chatroom) -> None:
+        """Adds a new chatroom window to the manager."""
 
-            for message in chat.messages:
-                window.add_message(message, False)
+        def _close_and_open_menu(window: ptg.Window, _: str) -> None:
+            """Closes chatroom window and opens chatroom selector."""
 
-            self.manager.add(window)
-            self.active_windows.append(window)
+            self.manager.add(self.construct_window())
+            window.close()
 
-            for box in window.conv_box:
-                if isinstance(box, MessageBox):
-                    box.update()
+        window = ChatroomWindow(chatroom, self._cup)
+        window.bind(ptg.keys.ESC, _close_and_open_menu)
+
+        for message in chatroom.messages:
+            window.add_message(message, False)
+
+        self.manager.add(window)
+        caller.close()
+        self.active_windows.append(window)
+
+        for box in window.conv_box:
+            if isinstance(box, MessageBox):
+                box.update()
 
     def _error(
         self, result: Response | Exception, method: str, req_kwargs: dict[str, Any]
@@ -154,15 +164,32 @@ class TeahazApplication(PagodaApplication):
 
             return inner
 
+        def _get_chatroom_toggle(parent: ptg.Window) -> widgets.ToggleSection:
+            """Gets a ToggleSection with all chatrooms"""
+
+            section = widgets.ToggleSection(
+                ptg.Label("[title]Logged-in chatrooms", parent_align=1)
+            )
+
+            for chat in self._cup.chatrooms:
+                section += [
+                    chat.name,
+                    lambda *_, chat=chat: self._add_chatroom_window(parent, chat),
+                ]
+
+            section.toggle()
+            return section
+
         window = (
-            self._get_base_window(**attrs)
-            + ""
-            + ptg.Button("Choose from logged-in chatrooms")
+            self._get_base_window(overflow=ptg.Overflow.RESIZE, **attrs)
             + ""
             + ptg.Button("Create a chatroom", _get_runner(self._cup.create_chatroom))
             + ptg.Button("Log into a chatroom", _get_runner(self._cup.login))
             + ""
         )
+
+        window += _get_chatroom_toggle(window)
+        window += ""
 
         self.active_windows.append(window)
 
@@ -200,8 +227,7 @@ class TeahazApplication(PagodaApplication):
         if chatroom is None:
             return
 
-        self.manager.add(ChatroomWindow(chatroom, self._cup))
-        self.close(caller)
+        self._add_chatroom_window(caller, chatroom)
 
     def stop(self) -> None:
         """Terminate all cup processes."""
