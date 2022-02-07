@@ -32,6 +32,10 @@ config:
         styles:
             border: "[60]{item}"
 
+    Button:
+        chars:
+            delimiter: ["[ ", " ]"]
+
 markup:
     title: 210 bold
     field-text: '245'
@@ -140,7 +144,7 @@ class Pagoda(ptg.WindowManager):
     def setup_styles() -> None:
         """Sets up styling. Note: This will support user-configs at some point."""
 
-        def _macro_gradient(base, depth, item) -> str:
+        def _macro_gradient(base: str, depth: str, item: str) -> str:
             if not base.isdigit():
                 raise ValueError(f"Gradient base has to be digit, not {type(base)}.")
 
