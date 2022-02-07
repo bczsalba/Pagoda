@@ -96,6 +96,9 @@ class TeahazApplication(PagodaApplication):
             if isinstance(box, MessageBox):
                 box.update()
 
+        window.conv_box.get_lines()
+        window.conv_box.scroll_end(-1)
+
     def _error(
         self, result: Response | Exception, method: str, req_kwargs: dict[str, Any]
     ) -> None:

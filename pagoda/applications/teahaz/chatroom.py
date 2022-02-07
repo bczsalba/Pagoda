@@ -360,13 +360,17 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
             is_unsent=True,
         )
 
+        self._sent_messages.append((message.uid, box))
+
         style = ptg.MarkupFormatter("[240]{item}")
         box.set_style("border", style)
         box.set_style("corner", style)
 
         self.conv_box += box
         box.update()
-        self._sent_messages.append((message.uid, box))
+
+        self.conv_box.get_lines()
+        self.conv_box.scroll_end(-1)
 
     def add_message(self, message: Message, do_update: bool = True) -> None:
         """Adds a message to the window.
@@ -393,6 +397,9 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
 
         if should_group and self._previous_msg_box is not None:
             self._previous_msg_box.add_message(message, do_update)
+
+            if do_update:
+                self.conv_box.scroll_end(-1)
             return
 
         box = MessageBox(
@@ -400,11 +407,16 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
             parent_align=(2 if message.username == self.chatroom.username else 0),
         )
 
-        self.conv_box += ""
-        self.conv_box += ""
+        if len(self.conv_box) > 0:
+            self.conv_box += ""
+            self.conv_box += ""
+
         self.conv_box += box
 
         self._previous_msg_box = box
+
+        if do_update:
+            self.conv_box.scroll_end(-1)
         return
 
     def get_lines(self) -> list[str]:
