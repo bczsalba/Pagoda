@@ -150,6 +150,10 @@ class Pagoda(ptg.WindowManager):
 
             return ptg.markup.parse(f"[{int(base) + int(depth) * 36}]{item}")
 
+        box = ptg.boxes.DOUBLE
+        ptg.Window.set_char("border", box.borders)
+        ptg.Window.set_char("corner", box.corners)
+
         ptg.markup.define("gradient", _macro_gradient)
         ptg.markup.define("title", lambda item: item.title().replace("_", " "))
 

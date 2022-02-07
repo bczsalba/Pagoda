@@ -91,7 +91,7 @@ class Header(ptg.Container):
         self._label = ptg.Label(label)
         self._add_widget(self._label)
 
-        chars = list(self._get_char("border"))
+        chars = ptg.boxes.SINGLE.borders.copy()
         chars[0] = ""
         chars[1] = ""
         chars[2] = ""

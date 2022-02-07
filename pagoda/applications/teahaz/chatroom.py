@@ -156,7 +156,6 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
             ]
         )
 
-        self.box = ptg.boxes.DOUBLE
         self.width = 100
 
         # Messages that have been sent, but not yet received back
