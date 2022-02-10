@@ -7,7 +7,7 @@ import inspect
 from typing import Any, Callable
 
 import pytermgui as ptg
-from teahaz import Teacup
+from teahaz import threaded
 
 
 TEMP_DEFAULTS = {
@@ -267,7 +267,7 @@ def from_signature(
 
     # Create submission button
     # TODO: This should open a loader modal.
-    threaded = Teacup.threaded(
+    call_threaded = threaded(
         method,
         lambda *args, **kwargs: handle_output(window, *args, **kwargs)
         if handle_output
@@ -278,7 +278,7 @@ def from_signature(
 
     window += ptg.Button(
         "Submit!",
-        lambda *_: threaded(**{key: value() for key, value in fields.items()}),
+        lambda *_: call_threaded(**{key: value() for key, value in fields.items()}),
     )
 
     return window
