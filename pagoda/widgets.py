@@ -72,7 +72,7 @@ class Menubar(ptg.Container):
         line = ""
         for widget in self._widgets:
             widget.pos = (self.pos[0] + ptg.real_length(line), self.pos[1] + len(lines))
-            line += widget.get_lines()[0]
+            line += widget.get_lines()[0] + " "
 
         lines.append(line)
         return lines
