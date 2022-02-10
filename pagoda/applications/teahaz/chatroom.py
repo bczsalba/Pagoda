@@ -2,15 +2,52 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 from datetime import datetime
-from dataclasses import asdict
 
 import pytermgui as ptg
-from teahaz import Teacup, Chatroom, Message, Event, Invite, Channel
+from teahaz import threaded, Chatroom, Message, Event, Channel
 
 from ... import widgets
+
+
+class MessageButton(ptg.Button):
+    """A clickable message."""
+
+    def __init__(self, content: Message, **attrs) -> None:
+        """Initializes a messagebutton.
+
+        Args:
+            content: The message associated with this button.
+        """
+
+        super().__init__(**attrs)
+
+        self.set_style("label", ptg.MarkupFormatter("[teahaz-message]{item}"))
+        self.set_style(
+            "highlight", ptg.MarkupFormatter("[teahaz-message_selected]{item}")
+        )
+        self.set_char("delimiter", ["", ""])
+
+        self.content = content
+        self.label = ""
+
+    def get_lines(self) -> list[str]:
+        """Assigns label from self.content & returns super().get_lines()."""
+
+        if self.content.message_type == "system":
+            # TODO: This is not yet implemented due to the soon-changing API.
+            return []
+
+        label = str(self.content.data)
+        if isinstance(self.content.data, bytes) and self.content.message_type == "file":
+            label = "<file>"
+
+        if not self.content.is_delivered:
+            label = "[teahaz-message_unsent]" + label
+
+        self.label = label
+        return super().get_lines()
 
 
 class MessageBox(ptg.Container):
@@ -25,13 +62,6 @@ class MessageBox(ptg.Container):
 
     def __init__(self, *messages: Message, **attrs) -> None:
         """Initializes a MessageBox.
-
-        This widget only calculates changes if its size changed
-        or new messages were added for perfomance reasons.
-
-        It also assumes all messages come from the same author,
-        and within a certain amount of time. This is handled by
-        ChatroomWindow.
 
         Args:
             *messages: The messages this box will display.
@@ -48,6 +78,18 @@ class MessageBox(ptg.Container):
         for message in messages:
             self._messages.append(message)
 
+        self._previous_pos: tuple[int, int] = self.pos
+        self.update()
+
+    def __contains__(self, other: object) -> bool:
+        """Determines whether other is contained within self._messages."""
+
+        return other in self._messages
+
+    def remove_msg(self, msg: Message) -> None:
+        """Removes a message from self._messages."""
+
+        self._messages.remove(msg)
         self.update()
 
     def add_message(self, message: Message, do_update: bool = True) -> None:
@@ -64,19 +106,15 @@ class MessageBox(ptg.Container):
         if do_update:
             self.update()
 
-    def update(self) -> None:
+    def update(self, run_getlines: bool = True) -> None:
         """Updates box content."""
 
         self._widgets = []
         total = len(self._messages)
 
         for i, message in enumerate(self._messages):
-            # This shouldn't happen
-            if message.message_type.startswith("system"):
-                continue
-
             if i > 0:
-                self._add_widget("")
+                self._add_widget("", run_getlines)
 
             show_name = i == 0 and not self.is_unsent
             show_time = i == total - 1 and not self.is_unsent
@@ -86,21 +124,13 @@ class MessageBox(ptg.Container):
                     ptg.Label(
                         "[teahaz-default_username]" + str(message.username),
                         parent_align=self.parent_align,
-                    )
+                    ),
+                    run_getlines,
                 )
 
-            data = "<file>" if not isinstance(message.data, str) else message.data
-
-            if self.is_unsent:
-                self._add_widget("")
-                data = "[teahaz-unsent_message]" + data
-            else:
-                data = "[teahaz-message]" + data
-
-            if i == self.selected_index:
-                data = "[inverse]" + data
-
-            self._add_widget(ptg.Label(data, parent_align=self.parent_align))
+            self._add_widget(
+                MessageButton(message, parent_align=self.parent_align), run_getlines
+            )
 
             if show_time:
                 time = datetime.fromtimestamp(message.send_time).strftime(
@@ -109,115 +139,60 @@ class MessageBox(ptg.Container):
                 self._add_widget(
                     ptg.Label(
                         "[teahaz-timestamp]" + time, parent_align=self.parent_align
-                    )
+                    ),
+                    run_getlines,
                 )
 
-        self._cached_lines = super().get_lines()
 
-    def get_lines(self) -> list[str]:
-        """Returns cached lines when possible, only updates content when size was changed."""
-
-        return self._cached_lines
-
-
+# Refactoring further will just ruin readability. 8/7 ain't too bad anyway.
 class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attributes
-    """The Pagoda Chatroom window."""
+    """A window displaying a single chatroom."""
 
-    cup: Teacup
-    chatroom: Chatroom
-
-    is_dirty = True
     overflow = ptg.Overflow.HIDE
+    is_dirty = False
+    """Force constant updates."""
 
-    def __init__(self, chatroom: Chatroom, cup: Teacup, **attrs: Any) -> None:
-        """Initialize a chatroom window.
+    def __init__(self, chatroom: Chatroom, **attrs: Any) -> None:
+        """Initializes a ChatroomWindow."""
 
-        This method creates our Teacup for managing the API,
-        sets up its bindings and does some other things that I
-        cannot think of at the moment."""
-
-        super().__init__(**attrs)
+        super().__init__(width=100, **attrs)
 
         self.chatroom = chatroom
         self.chatroom.subscribe(Event.MSG_NEW, self.add_message)
-        self.chatroom.subscribe(Event.MSG_SENT, self._add_sent_message)
+        self.chatroom.subscribe(Event.MSG_SENT, self.add_message)
 
-        self.cup = cup
-        self._send_threaded = self.cup.threaded(self.chatroom.send)
+        self._old_size_info = 0, (self.width, self.height)
 
-        self.conv_box = ptg.Container(
-            height=25, overflow=ptg.Overflow.SCROLL, vertical_align=0
-        )
-        self.conv_box.box = ptg.boxes.Box(
-            [
-                "   ",
-                " x ",
-                "   ",
-            ]
-        )
+        self._sent_messages: dict[str, tuple[Message, MessageBox]] = {}
+        self._previous_box: MessageBox | None = None
+        self._previous_message: Message | None = None
 
-        self.width = 100
+        self.header = widgets.Header("This is a header")
+        self._add_widget(self.header)
+        self._update_header()
 
-        # Messages that have been sent, but not yet received back
-        self._sent_messages: list[tuple[str, MessageBox]] = []
-
-        self._previous_msg: Message | None = None
-        self._previous_msg_box: MessageBox | None = None
-
-        self._old_size = (self.width, self.height)
-        self._old_height_sum = self._get_height_sum()
-
-        assert self.chatroom.active_channel is not None
-        self._header = widgets.Header(
-            "[teahaz-chatroom_name]"
-            + str(self.chatroom.name)
-            + "[/] - [teahaz-channel_name]"
-            + str(self.chatroom.active_channel.name)
-        )
-        self._add_widget(self._header)
+        self.conv_box = ptg.Container(overflow=ptg.Overflow.SCROLL, vertical_align=0)
+        self.conv_box.box = ptg.boxes.EMPTY
+        self.conv_box.height = 30
         self._add_widget(self.conv_box)
 
         field = ptg.InputField()
-        field.bind(ptg.keys.RETURN, self._send_field_value)
+        field.bind(ptg.keys.ENTER, self._send_message)
+        self._add_widget(widgets.get_inputbox("Message", field))
 
-        self._add_widget(widgets.get_inputbox("Message", field=field))
+        self.height = 40
 
-        self.bind(ptg.keys.CTRL_T, self._show_util_window)
-        self.height = int(4 * ptg.terminal.height / 5)
+        self.bind(ptg.keys.TAB, self._add_util_window)
+        self._switch_channel(self.chatroom.channels[0])
 
-    def _switch_channel(self, channel: Channel, caller: ptg.Window) -> None:
-        """Switches self.chatroom to new channel, updates header.
+    def _add_util_window(self, _: ptg.Window, __: str) -> None:
+        """Adds a Chatroom utility window."""
 
-        Args:
-            channel: The new channel.
-        """
+        def _execute_switch(caller: ptg.Window, channel: Channel) -> None:
+            """Switches to new channel and closes caller window."""
 
-        self.chatroom.active_channel = channel
-
-        # TODO: The default label is kept in cache.
-        self._header.label = (
-            "[teahaz-chatroom_name]"
-            + str(self.chatroom.name)
-            + "[/] - [teahaz-channel_name]"
-            + str(self.chatroom.active_channel.name)
-        )
-
-        self.conv_box.set_widgets([])
-        for message in self.chatroom.messages:
-            if not message.channel_id == channel.uid:
-                continue
-
-            self.add_message(message)
-
-        caller.close()
-
-    def _show_util_window(self, _: ptg.Window, __: str) -> None:
-        """Shows (adds to manager) a Chatroom utility window.
-
-        The arguments can be disregarded: First argument is a redundant reference
-        to self, the second is the key that triggered this binding. Neither of
-        which are important to us.
-        """
+            caller.close()
+            self._switch_channel(channel)
 
         def _confirm_switch(caller: ptg.Window, channel: Channel) -> None:
             """Confirms user wanting to switch to newly created channel."""
@@ -231,7 +206,7 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
                 "Would you like to switch to it?",
                 "",
                 ptg.Splitter(
-                    ["Yes!", lambda *_: self._switch_channel(channel, window)],
+                    ["Yes!", lambda *_: _execute_switch(window, channel)],
                     ["No", lambda *_: window.close()],
                 ),
                 is_modal=True,
@@ -275,158 +250,114 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
             channels += {
                 (prefix + channel.name): [
                     "Switch",
-                    lambda *_, window=window, channel=channel: self._switch_channel(
-                        channel, window
+                    lambda *_, window=window, channel=channel: _execute_switch(
+                        window, channel
                     ),
                 ]
             }
+
         channels += ["Create...", _create_channel]
         body += channels + ""
 
         assert self.manager is not None
         self.manager.add(window)
 
-    def _write_invite(self, caller: ptg.Window, invite: Invite | None) -> None:
-        """Writes the invite to a file."""
+    def _update_header(self) -> None:
+        """Updates header value."""
 
-        file_dialog: ptg.Window
+        self.header.label = "[teahaz-chatroom_name]" + str(self.chatroom.name) + "[/]: "
+        if self.chatroom.active_channel is not None:
+            self.header.label += (
+                "[teahaz-channel_name]" + self.chatroom.active_channel.name
+            )
 
-        def _write(name: str) -> None:
-            """Writes the invite."""
+    def _switch_channel(self, channel: Channel) -> None:
+        """Switches to a different channel & load new messages."""
 
-            with open(name, "w", encoding="utf-8") as file:
-                json.dump(asdict(invite), file, indent=2)
-
-            file_dialog.close()
-            caller.close()
-
-        if invite is None:
+        if channel is None:
             return
 
-        if self.chatroom.name is None:
-            default = "invite.inv"
-        else:
-            default = self.chatroom.name.replace(" ", "_") + ".inv"
+        self.chatroom.active_channel = channel
 
-        field = ptg.InputField(value=default)
+        self._sent_messages = {}
+        self._previous_box = None
+        self._previous_message = None
 
-        file_dialog = (
-            ptg.Window(is_modal=True, width=50)
-            + "[title]Invite created!"
-            + ""
-            + widgets.get_inputbox("Save invite as", field)
-            + ""
-            + ptg.Button("Save!", lambda *_: _write(field.value))
-        )
+        self.conv_box.set_widgets([])
+        for message in channel.messages:
+            self.add_message(message)
 
-        assert self.manager is not None
-        self.manager.add(file_dialog)
+        self._update_header()
 
-    def _send_field_value(self, field: ptg.InputField, _: str) -> None:
-        """Sends the input field's value.
-
-        This method uses self._send_threaded to send the message under a thread.
-
-        Args:
-            field: The field whose value should be sent.
-        """
+    def _send_message(self, field: ptg.InputField, _: str) -> None:
+        """Sends message as field's content."""
 
         if field.value == "":
             return
 
-        self._send_threaded(field.value)
+        threaded(self.chatroom.send)(field.value)
         field.value = ""
 
-    def _get_height_sum(self) -> int:
-        """Calculates the sum of non-self._convbox widget heights."""
-
-        return sum(
-            widget.height for widget in self._widgets if widget is not self.conv_box
-        )
-
-    def _add_sent_message(self, message: Message) -> None:
-        """Adds a message to the window.
-
-        This is called as a callback for self.cup.
-
-        Args:
-            message: The teahaz Message instance.
-        """
-
-        box = MessageBox(
-            message,
-            parent_align=(2 if message.username == self.chatroom.username else 0),
-            is_unsent=True,
-        )
-
-        self._sent_messages.append((message.uid, box))
-
-        style = ptg.MarkupFormatter("[240]{item}")
-        box.set_style("border", style)
-        box.set_style("corner", style)
-
-        self.conv_box += box
-        box.update()
-
-        self.conv_box.get_lines()
-        self.conv_box.scroll_end(-1)
-
     def add_message(self, message: Message, do_update: bool = True) -> None:
-        """Adds a message to the window.
+        """Adds a message to the conversation box."""
 
-        This is called as a callback for self.cup.
+        if message.uid in self._sent_messages:
+            sent, box = self._sent_messages[message.uid]
+            box.remove_msg(sent)
+            box.update()
 
-        Args:
-            message: The teahaz Message instance.
-        """
+            del self._sent_messages[message.uid]
 
-        for i, (uid, sent_box) in enumerate(self._sent_messages):
-            if uid == message.uid:
-                self.conv_box.remove(sent_box)
-                self._sent_messages.pop(i)
+        prev = self._previous_message
 
-        prev = self._previous_msg
-        self._previous_msg = message
+        align = 2 if message.username == self.chatroom.username else 0
 
-        should_group = (
-            prev is not None
-            and prev.username == message.username
-            and message.send_time - prev.send_time < 600
-        )
+        if prev is not None:
+            if (
+                message.username == prev.username
+                and message.send_time - prev.send_time < 600
+            ):
+                assert self._previous_box is not None
+                self._previous_box.add_message(message, do_update)
 
-        if should_group and self._previous_msg_box is not None:
-            self._previous_msg_box.add_message(message, do_update)
+        else:
+            self._previous_box = MessageBox(message, parent_align=align)
+            if len(self.conv_box) > 0:
+                self.conv_box += ""
+                self.conv_box += ""
 
-            if do_update:
-                self.conv_box.scroll_end(-1)
-            return
+            self.conv_box += self._previous_box
 
-        box = MessageBox(
-            message,
-            parent_align=(2 if message.username == self.chatroom.username else 0),
-        )
+        assert self._previous_box is not None
+        self._previous_message = message
 
-        if len(self.conv_box) > 0:
-            self.conv_box += ""
-            self.conv_box += ""
-
-        self.conv_box += box
-
-        self._previous_msg_box = box
+        if not message.is_delivered:
+            self._sent_messages[message.uid] = (message, self._previous_box)
 
         if do_update:
+            self._previous_box.update()
             self.conv_box.scroll_end(-1)
-        return
+
+        self.select(self.selectables_length - 1)
 
     def get_lines(self) -> list[str]:
-        """ "Updates self.conv_box size before returning super().get_lines()."""
+        """Updates self.conv_box size before returning super().get_lines()."""
 
-        height_sum = self._get_height_sum()
-        if (
-            not height_sum == self._old_height_sum
-            or not (self.width, self.height) == self._old_size
-        ):
+        def _calculate_height_sum() -> int:
+            """Calculates sum of non-convbox widgets."""
+
+            if not hasattr(self, "conv_box"):
+                return 0
+
+            return sum(
+                widget.height for widget in self._widgets if widget is not self.conv_box
+            )
+
+        height_sum = _calculate_height_sum()
+        old_sum, old_size = self._old_size_info
+
+        if not height_sum == old_sum or not (self.width, self.height) == old_size:
             self.conv_box.height = self.height - 2 - height_sum
-            self._old_size = (self.width, self.height)
+            self._old_size_info = height_sum, (self.width, self.height)
 
         return super().get_lines()

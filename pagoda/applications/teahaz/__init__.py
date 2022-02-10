@@ -42,16 +42,20 @@ class TeahazApplication(PagodaApplication):
     def __init__(self, manager: Pagoda) -> None:
         """Initializes the TeahazApplication, and its Teacup instance."""
 
+        self._cup: Teacup
+
         ptg.markup.alias("teahaz-chatroom_name", "bold 210")
-        ptg.markup.alias("teahaz-channel_name", "bold 72")
         ptg.markup.alias("teahaz-default_username", "210 bold")
+        ptg.markup.alias("teahaz-channel_name", "bold 72")
+
         ptg.markup.alias("teahaz-message", "")
-        ptg.markup.alias("teahaz-unsent_message", "240")
+        ptg.markup.alias("teahaz-message_selected", "inverse")
+        ptg.markup.alias("teahaz-message_unsent", "240")
+        ptg.markup.alias("teahaz-message_system", "238")
+
         ptg.markup.alias("teahaz-timestamp", "bold 72")
 
         self._previous_exception: Exception | None = None
-
-        self._cup: Teacup
 
         super().__init__(manager)
 
@@ -60,14 +64,14 @@ class TeahazApplication(PagodaApplication):
         """Restores chatrooms from save data."""
 
         if not os.path.exists(SAVE_ROOT):
-            return None
+            return Teacup()
 
         return Teacup().from_dump(SAVE_ROOT)
 
     def start(self) -> None:
         """Restores save state."""
 
-        # This is always going to evaluate to a Teacup.
+        # Teacup is always non-null here.
         self._cup = self._restore() if self.do_restore else Teacup()  # type: ignore
 
         self._cup.subscribe_all(Event.ERROR, self._error)
@@ -82,11 +86,8 @@ class TeahazApplication(PagodaApplication):
             self.manager.add(self.construct_window())
             window.close()
 
-        window = ChatroomWindow(chatroom, self._cup)
+        window = ChatroomWindow(chatroom)
         window.bind(ptg.keys.ESC, _close_and_open_menu)
-
-        for message in chatroom.messages:
-            window.add_message(message, False)
 
         self.manager.add(window)
         caller.close()
@@ -258,7 +259,7 @@ class TeahazApplication(PagodaApplication):
             if chatroom is None:
                 return
 
-            window = ChatroomWindow(chatroom, self._cup)
+            window = ChatroomWindow(chatroom)
             self.active_windows.append(window)
             self.manager.add(window)
 
