@@ -366,5 +366,9 @@ class ChatroomWindow(ptg.Window):  # pylint: disable=too-many-instance-attribute
         if not height_sum == old_sum or not (self.width, self.height) == old_size:
             self.conv_box.height = self.height - 2 - height_sum
             self._old_size_info = height_sum, (self.width, self.height)
+            for box in self.conv_box:
+                if not isinstance(box, MessageBox):
+                    continue
+                box.update()
 
         return super().get_lines()
