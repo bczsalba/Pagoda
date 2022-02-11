@@ -47,7 +47,14 @@ class MessageButton(ptg.Button):
             label = "[teahaz-message_unsent]" + label
 
         self.label = label
-        return super().get_lines()
+
+        width = self.width
+        lines = super().get_lines()
+        self.width = width
+
+        broken = list(ptg.break_line(" ".join(lines), self.width))
+        self.height = len(broken)
+        return broken
 
 
 class MessageBox(ptg.Container):
