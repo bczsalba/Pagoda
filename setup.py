@@ -9,7 +9,7 @@ setup(
     description="",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    install_requires=["pytermgui==2.0.0", "teahaz.py==0.1.0", "requests"],
+    install_requires=["pytermgui==2.1.0", "teahaz.py==0.1.0", "requests"],
     python_requires=">=3.7.0",
     url="https://github.com/bczsalba/pagoda",
     author="BcZsalba",
