@@ -29,6 +29,13 @@ def parse_arguments() -> tuple[Namespace, list[str]]:
                 All further arguments are handled by the given app.",
     )
 
+    parser.add_argument(
+        "-l",
+        "--launch",
+        action="store_true",
+        help="Launch the application given using the `-app` argument.",
+    )
+
     return parser.parse_args(sys.argv[1:ending_index]), sys.argv[ending_index:]
 
 
@@ -37,7 +44,7 @@ def main() -> None:
 
     args, remaining = parse_arguments()
 
-    with Pagoda(remaining, args.app) as pagoda:
+    with Pagoda(remaining, args.app, args.launch) as pagoda:
         pagoda.run()
 
 

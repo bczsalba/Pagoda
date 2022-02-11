@@ -68,7 +68,9 @@ class Pagoda(ptg.WindowManager):
     #       error handler like this would work.
     # applications.ErrorHandler(),
 
-    def __init__(self, remaining_args: list[str], app_id: str | None = None) -> None:
+    def __init__(
+        self, remaining_args: list[str], app_id: str | None = None, launch: bool = False
+    ) -> None:
         """Initialize application."""
 
         super().__init__()
@@ -104,6 +106,10 @@ class Pagoda(ptg.WindowManager):
 
         for starting_app in self.applications:
             starting_app.start()
+
+        if app_id is not None and launch:
+            arg_app = self._find_app_by_id(app_id)
+            self.add(arg_app.construct_window())
 
     def _find_app_by_id(self, app_id: str) -> applications.PagodaApplication:
         """Returns an App by its name.
